@@ -95,7 +95,7 @@ class VLM(nn.Module):
         for p in self.qwen.parameters():
             p.requires_grad = False
 
-        hidden_size = self.qwen.config.hidden_size
+        self.hidden_size = self.qwen.config.hidden_size
         self.device = self.qwen.device
 
 
@@ -116,9 +116,9 @@ class VLM(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, head):
+    def __init__(self, model_name = "Qwen/Qwen2.5-VL-7B-Instruct", head = "MLP"):
         super().__init__()
-        self.vlm = VLM()
+        self.vlm = VLM(model_name=model_name)
         self.vlm.eval()
         self.head = self.get_head(head)
         self.head_name = head
@@ -137,9 +137,11 @@ class Encoder(nn.Module):
         heads = ["MLP", "CNN", "GRU"]
         assert head in heads, f"{head} is not in {heads}"
 
+        hidden_size = self.vlm.hidden_size
+
         if head == "MLP":
-            return MLPProjector()
+            return MLPProjector(hidden_size=hidden_size)
         if head == "CNN":
-            return CNNProjector()
+            return CNNProjector(hidden_size=hidden_size)
         if head == "GRU":
-            return GRUProjector()
+            return GRUProjector(hidden_size=hidden_size)

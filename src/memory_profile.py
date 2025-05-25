@@ -41,6 +41,10 @@ report_mem("after data transfer")
 # forward + backward
 model.head.train()
 query_emb = model(inputs)
+report_mem("after fwd")
 loss = HardNegativeNCE()(query_emb, targets, temp=0.07)
 loss.backward()
-report_mem("after fwd+bwd")
+report_mem("after bwd")
+
+for p in model.vlm.qwen.parameters():
+    print(f"{p.requires_grad = }")

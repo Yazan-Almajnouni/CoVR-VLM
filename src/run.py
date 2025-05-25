@@ -1,13 +1,34 @@
 from trainer import train
 from dataset import VideoPathsDataLoader
-from models import VLM, MLPProjector, CNNProjector, GRUProjector, Encoder
+from models import Encoder
 import torch
 import torch.nn as nn
 import cProfile, pstats
-import sys
+import argparse
+
+def args_parse():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-b", "--batch",
+        type=int,
+        default=32,
+        help="batch size"
+    )
+    parser.add_argument(
+        "-v", "--vlm",
+        type=str,
+        default="Qwen/Qwen2.5-VL-7B-Instruct",
+        help="VLM to use"
+    )
+    args = parser.parse_args()
+
+    return args
 
 if __name__ == "__main__":
-    batch_size = int(sys.argv[1])
+
+    args = args_parse()
+    batch_size = args.batch
+    vlm = args.vlm
 
     torch.manual_seed(0)
     training_annotations = "annotations/mini_train_set.csv" 
@@ -17,7 +38,7 @@ if __name__ == "__main__":
 
     device = "cuda"
 
-    model = Encoder(head = "MLP")
+    model = Encoder(model_name=vlm, head = "MLP")
     optim = torch.optim.Adam(model.head.parameters())
 
 
