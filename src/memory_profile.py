@@ -26,8 +26,8 @@ model = Encoder(head = "MLP").to(device)
 optim  = torch.optim.Adam(model.head.parameters())
 report_mem("model initialized")
 
-training_annotations = "annotations/mini_train_set.csv" 
-training_loader = VideoPathsDataLoader(training_annotations, batch_size=32)
+training_annotations = "annotations/train_set.csv" 
+training_loader = VideoPathsDataLoader(training_annotations, batch_size=96)
 
 # grab a single batch
 dl = iter(training_loader)
@@ -45,6 +45,3 @@ report_mem("after fwd")
 loss = HardNegativeNCE()(query_emb, targets, temp=0.07)
 loss.backward()
 report_mem("after bwd")
-
-for p in model.vlm.qwen.parameters():
-    print(f"{p.requires_grad = }")

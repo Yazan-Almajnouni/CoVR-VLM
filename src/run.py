@@ -31,7 +31,7 @@ if __name__ == "__main__":
     vlm = args.vlm
 
     torch.manual_seed(0)
-    training_annotations = "annotations/mini_train_set.csv" 
+    training_annotations = "annotations/train_set.csv" 
     validation_annotations = "annotations/mini_val_set.csv"
     training_loader = VideoPathsDataLoader(training_annotations, batch_size=batch_size)
     validation_loader = VideoPathsDataLoader(validation_annotations, batch_size=batch_size)

@@ -98,6 +98,9 @@ class VLM(nn.Module):
         self.hidden_size = self.qwen.config.hidden_size
         self.device = self.qwen.device
 
+        identity_head = torch.nn.Identity().to(device=self.device, dtype=self.dtype)
+        self.qwen.set_output_embeddings(identity_head)
+
 
 
     def forward(self, inputs) -> torch.Tensor:
@@ -106,11 +109,11 @@ class VLM(nn.Module):
         with torch.no_grad():
             outputs = self.qwen(
                 **inputs,
-                output_hidden_states=True,
+                output_hidden_states=False,
                 return_dict=True
             )
 
-        last_hidden = outputs.hidden_states[-1]  # (B, S, D)
+        last_hidden = outputs.logits  # (B, S, D)
 
         return last_hidden
 
