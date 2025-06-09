@@ -98,10 +98,61 @@ class VLM(nn.Module):
         self.hidden_size = self.qwen.config.hidden_size
         self.device = self.qwen.device
 
+        # identity_head = torch.nn.Identity().to(device=self.device, dtype=self.dtype)
+        # self.qwen.set_output_embeddings(identity_head)
+
+
+    def forward(self, inputs) -> torch.Tensor:
+        with torch.no_grad():
+            outputs = self.qwen.generate(
+                **inputs,
+                max_new_tokens=100,
+                output_hidden_states=True,
+                return_dict_in_generate=True,
+            )
+        
+        generated_token_embeddings_list = []
+
+        for token_step_hidden_states in outputs.hidden_states:
+            last_layer_hs_for_token = token_step_hidden_states[-1]
+            generated_token_embeddings_list.append(last_layer_hs_for_token)
+
+        generated_embeddings_tensor = torch.cat(generated_token_embeddings_list, dim=1)
+
+        return generated_embeddings_tensor
+        
+
+class EmbedVLM(nn.Module):
+    """
+    loads and freezes a VLM
+    """
+    def __init__(
+        self,
+        model_name: str = "Qwen/Qwen2.5-VL-7B-Instruct",
+        dtype: torch.dtype = torch.bfloat16,
+        attn_impl: str = "flash_attention_2",
+        device_map: str = "auto",
+    ):
+        super().__init__()
+
+        self.model_name = model_name
+        self.dtype = dtype
+
+        # load & freeze Qwen
+        self.qwen = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+            model_name,
+            torch_dtype=dtype,
+            attn_implementation=attn_impl,
+            device_map=device_map,
+        )
+        for p in self.qwen.parameters():
+            p.requires_grad = False
+
+        self.hidden_size = self.qwen.config.hidden_size
+        self.device = self.qwen.device
+
         identity_head = torch.nn.Identity().to(device=self.device, dtype=self.dtype)
         self.qwen.set_output_embeddings(identity_head)
-
-
 
     def forward(self, inputs) -> torch.Tensor:
 
@@ -119,9 +170,12 @@ class VLM(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, model_name = "Qwen/Qwen2.5-VL-7B-Instruct", head = "MLP"):
+    def __init__(self, model_name = "Qwen/Qwen2.5-VL-7B-Instruct", head = "MLP", autoregressive = True):
         super().__init__()
-        self.vlm = VLM(model_name=model_name)
+        if autoregressive:
+            self.vlm = VLM(model_name=model_name)
+        else:
+            self.vlm = EmbedVLM(model_name=model_name)
         self.vlm.eval()
         self.head = self.get_head(head)
         self.head_name = head

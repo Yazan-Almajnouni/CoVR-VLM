@@ -22,12 +22,18 @@ def report_mem(label=""):
     print(torch.cuda.memory_summary())
 
 # build model and optimizer
-model = Encoder(head = "MLP").to(device)
+autoregressive = False
+model_name="Qwen/Qwen2.5-VL-3B-Instruct"
+batch_size = 208
+print(f"{autoregressive = }")
+print(f"{model_name = }")
+print(f"{batch_size = }")
+model = Encoder(model_name=model_name, head = "MLP", autoregressive=autoregressive).to(device)
 optim  = torch.optim.Adam(model.head.parameters())
 report_mem("model initialized")
 
 training_annotations = "annotations/train_set.csv" 
-training_loader = VideoPathsDataLoader(training_annotations, batch_size=96)
+training_loader = VideoPathsDataLoader(training_annotations, batch_size=batch_size, num_workers=0)
 
 # grab a single batch
 dl = iter(training_loader)
