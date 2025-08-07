@@ -14,18 +14,18 @@ class RecallAtK:
         batch_size: int = 32,
         device: str = "cuda",
         num_workers: int = 0,
-        dtype: torch.dtype = torch.bfloat16
     ):
+        self.model = model
+        self.model.module.head.eval()
         self.device = device
-        self.model = model.to(device).eval()
+
+        self.dtype = model.module.dtype
         # our custom loader returns dicts with video_paths, embs, edits
         self.loader = VideoPathsDataLoader(
             csv_file,
             batch_size=batch_size,
-            shuffle=False,
             num_workers=num_workers,
         )
-        self.dtype = dtype
 
     def _compute_queries_and_targets(self):
         qs = []
@@ -33,11 +33,14 @@ class RecallAtK:
         with torch.no_grad():
             for batch in self.loader:
                 inputs, target_emb = batch
+                inputs = inputs.to(self.device)
+                target_emb = target_emb.to(self.device)
                 # model returns (B, D) query embeddings
-                q = self.model(inputs).to(self.device)
-                t = target_emb.to(self.device, dtype=self.dtype)
+                q = self.model(inputs)
+                t = target_emb.to(dtype=self.dtype)
                 qs.append(q)
                 ts.append(t)
+
         queries = torch.cat(qs, dim=0)  # (N, D)
         targets = torch.cat(ts, dim=0)  # (N, D)
         return queries, targets

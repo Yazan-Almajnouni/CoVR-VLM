@@ -4,6 +4,7 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from transformers import AutoProcessor
 from qwen_vl_utils import process_vision_info
+from torch.utils.data.distributed import DistributedSampler
 
 class VideoPathsDataset(Dataset):
     """
@@ -56,7 +57,6 @@ class VideoPathsDataLoader:
         self,
         csv_file: str,
         batch_size: int,
-        shuffle: bool = True,
         num_workers: int = 4,
         model_name: str = "Qwen/Qwen2.5-VL-7B-Instruct",
         prompt: str = "{}. Describe the changed video in details as if you have seen it.",
@@ -65,10 +65,11 @@ class VideoPathsDataLoader:
         self.loader = DataLoader(
             self.dataset,
             batch_size=batch_size,
-            shuffle=shuffle,
+            shuffle=False,
             num_workers=num_workers,
             pin_memory=True,
-            collate_fn=self._collate_fn
+            collate_fn=self._collate_fn,
+            sampler=DistributedSampler(self.dataset)
         )
 
         self.csv_file = csv_file

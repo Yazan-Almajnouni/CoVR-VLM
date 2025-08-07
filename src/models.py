@@ -50,6 +50,8 @@ class CNNProjector(nn.Module):
 class GRUProjector(nn.Module):
     def __init__(self, hidden_size = 3584, proj_size = 256, dtype = torch.bfloat16, device = "cuda"):
 
+        super().__init__()
+
         self.hidden_size = hidden_size
         self.proj_size = proj_size
         self.dtype = dtype
@@ -170,25 +172,24 @@ class EmbedVLM(nn.Module):
 
 
 class Encoder(nn.Module):
-    def __init__(self, model_name = "Qwen/Qwen2.5-VL-7B-Instruct", head = "MLP", autoregressive = True):
+    def __init__(self, rank, model_name = "Qwen/Qwen2.5-VL-7B-Instruct", head = "MLP", autoregressive = False):
         super().__init__()
+        self.device = f"cuda:{rank}"
         if autoregressive:
-            self.vlm = VLM(model_name=model_name)
+            self.vlm = VLM(model_name=model_name, device_map=self.device)
         else:
-            self.vlm = EmbedVLM(model_name=model_name)
+            self.vlm = EmbedVLM(model_name=model_name, device_map=self.device)
         self.vlm.eval()
-        self.head = self.get_head(head)
         self.head_name = head
+
+        self.head = self.get_head(head)
         self.dtype = self.head.dtype
 
     def forward(self, inputs):
-        inputs = inputs.to(device = self.vlm.device)
-        inputs = self.vlm(inputs)
+        vlm_outputs = self.vlm(inputs)
+        head_outputs = self.head(vlm_outputs)
 
-        inputs.to(self.head.device)
-        inputs = self.head(inputs)
-
-        return inputs
+        return head_outputs
     
     def get_head(self, head):
         heads = ["MLP", "CNN", "GRU"]
@@ -197,8 +198,8 @@ class Encoder(nn.Module):
         hidden_size = self.vlm.hidden_size
 
         if head == "MLP":
-            return MLPProjector(hidden_size=hidden_size)
+            return MLPProjector(hidden_size=hidden_size, device=self.device)
         if head == "CNN":
-            return CNNProjector(hidden_size=hidden_size)
+            return CNNProjector(hidden_size=hidden_size, device=self.device)
         if head == "GRU":
-            return GRUProjector(hidden_size=hidden_size)
+            return GRUProjector(hidden_size=hidden_size, device=self.device)

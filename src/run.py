@@ -6,6 +6,21 @@ import torch.nn as nn
 import cProfile, pstats
 import argparse
 
+from torch.profiler import profile, record_function, ProfilerActivity
+
+import torch.multiprocessing as mp
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.distributed import init_process_group, destroy_process_group
+import os
+
+import time
+
+def ddp_setup(rank, world_size):
+    os.environ["MASTER_ADDR"] = "localhost"
+    os.environ["MASTER_PORT"] = "12345"
+    init_process_group(backend="nccl", rank=rank, world_size=world_size)
+
+
 def args_parse():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -46,9 +61,9 @@ def args_parse():
 
     return args
 
-if __name__ == "__main__":
+def main(rank, world_size, args):
+    ddp_setup(rank, world_size)
 
-    args = args_parse()
     batch_size = args.batch
     vlm = args.vlm
     epochs = args.epochs
@@ -77,17 +92,31 @@ if __name__ == "__main__":
     training_loader = VideoPathsDataLoader(training_annotations, batch_size=batch_size)
     validation_loader = VideoPathsDataLoader(validation_annotations, batch_size=batch_size)
 
-    device = "cuda"
+    model = Encoder(model_name=vlm, head = "MLP", autoregressive=mode, rank=rank)
+    model = DDP(model, device_ids=[rank])
+    optim = torch.optim.Adam(model.module.head.parameters())
 
-    model = Encoder(model_name=vlm, head = "MLP", autoregressive=mode)
-    optim = torch.optim.Adam(model.head.parameters())
 
 
     # prof = cProfile.Profile()
     # prof.enable()
-    best_state, logs = train(model, training_loader, validation_loader, optim, device=device, epochs=epochs)
+    best_state, logs = train(model, training_loader, validation_loader, optim, epochs=epochs, rank=rank)
     # prof.disable()
     # stats = pstats.Stats(prof).sort_stats("cumtime")
     # stats.print_stats(20)
 
     print(logs)
+
+    destroy_process_group()
+
+
+if __name__ == "__main__":
+    args = args_parse()
+    world_size = torch.cuda.device_count()
+    print(f"{world_size = }")
+    start = time.time()
+    mp.spawn(main, args=(world_size, args), nprocs=world_size)
+    end = time.time()
+    
+    print(f"total training time = {(end - start):.2f}")
+
